@@ -16,6 +16,33 @@ que le micro discrimine.
 
 ---
 
+## 0. Démarrage rapide : un seul programme
+
+Sur le Mac, une fois les dépendances installées (§2) et les permissions
+accordées :
+
+```bash
+python run.py            # menu guidé
+python run.py all        # enregistre les sessions → entraîne → évalue → démo live
+```
+
+`run.py` enchaîne tout : il te fait enregistrer plusieurs sessions (en te
+rappelant de déplacer le micro entre elles), construit le split **par session**
+automatiquement, lance `preprocess → train → eval → baseline`, puis ouvre la
+**démo live** où tu tapes et vois en temps réel ce que le modèle croit que tu
+écris. Sous-commandes utiles :
+
+```bash
+python run.py collect --sessions 6 --keys 800   # enregistrer seulement
+python run.py pipeline                            # (ré)entraîner + évaluer sur les données existantes
+python run.py live                                # démo temps réel avec le modèle entraîné
+```
+
+Les sections suivantes détaillent chaque étape et ce qu'il faut savoir pour que
+la mesure soit honnête. Le mode live est décrit au §6bis.
+
+---
+
 ## 1. Contrainte méthodologique : split PAR SESSION
 
 Deux appuis de la même touche dans **une même session** sont quasi identiques
@@ -263,6 +290,40 @@ récupération de texte mémorisé).
 * `top-1 prose` ≫ `top-1 aléatoire` → l'écart est de la statistique de l'anglais.
   À ne jamais présenter comme une performance acoustique.
 
+## 6bis. Démo live — voir ce que le modèle « entend »
+
+```bash
+python live.py --checkpoint models/keycnn.pt     # ou: python run.py live
+```
+
+Charge le modèle entraîné, écoute le micro et le clavier en même temps, et pour
+chaque frappe découpe la **même fenêtre de 250 ms** que le pipeline, la passe au
+CNN et affiche sa prédiction à côté de la touche réellement tapée :
+
+```
+you h    model h    ✓  [h g j b n]  run top1  61.2% top5  88.4%
+you e    model e    ✓  [e r w s d]  run top1  61.8% top5  88.9%
+you l    model i    ✗  [i l k o p]  run top1  60.9% top5  89.1%
+```
+
+À l'arrêt (`Ctrl-C`), il imprime la transcription complète — ce que tu as tapé vs
+ce que le modèle a « entendu » — et la précision top-1/top-5.
+
+Points importants :
+
+* C'est la **démo acoustique honnête** : la fenêtre est placée par le timestamp
+  système de la frappe (pas de segmentation aveugle), et **aucun modèle de langue**
+  n'intervient — tu vois le classifieur acoustique seul décider, touche par touche.
+* Tes frappes live forment une **session inédite**, jamais vue à l'entraînement :
+  c'est un vrai test de généralisation, pas de mémorisation. Attends-toi à des
+  chiffres proches de l'aléatoire tenu à l'écart, pas des chiffres « prose + LM ».
+* Le chemin de features live est **identique** à `preprocess.py` (mêmes mel,
+  même normalisation par fenêtre puis par bin mel du checkpoint) : la démo mesure
+  bien le même modèle que `eval.py`.
+* Garde le **même clavier** et une **position de micro proche** de l'entraînement ;
+  un micro très différent fait chuter la démo (le modèle a appris un canal en
+  plus des touches).
+
 ## 7. Test à blanc sans micro
 
 Pour vérifier que la chaîne tourne (features → CNN → éval) sans rien enregistrer :
@@ -289,12 +350,14 @@ miniature de ce que le garde-fou anti-fuite du corpus sert à éviter en vrai.
 
 | fichier | rôle |
 |---|---|
+| `run.py` | **programme unique** : enregistre → entraîne → évalue → démo live (menu ou sous-commandes) |
 | `capture.py` | enregistrement micro + clavier avec prompt, horloge monotone commune, bip de sync ; classes partagées (Recorder, KeyLogger, écriture des fichiers) |
 | `record.py` | enregistrement libre : micro + **tous** les événements clavier (down/up), sans prompt |
 | `preprocess.py` | fenêtres 250 ms + mel-spectrogrammes, vérification du bip |
 | `train.py` | CNN, split par session, meilleur checkpoint |
 | `baseline_knn.py` | baseline k-NN sur MFCC, comparable au CNN (mêmes fenêtres, même split) |
 | `eval.py` | prose vs aléatoire, confusion, voisinage physique, décodage n-gram |
+| `live.py` | démo temps réel : tape et vois ce que le modèle croit que tu écris |
 | `kkr_common.py` | labels canoniques, layout physique, I/O session, mapping d'horloge |
 | `make_synthetic_sessions.py` | données factices pour tester la chaîne |
 | `fetch_lm_corpus.py` | texte public (Gutenberg) pour le modèle de langue |
