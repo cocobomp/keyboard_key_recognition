@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+
+# recordings, features, checkpoints and results are local artefacts
+data/
+models/
+results/
+corpus/lm_train.txt

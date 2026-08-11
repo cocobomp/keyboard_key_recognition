@@ -1,0 +1,13 @@
+# capture (macOS)
+sounddevice>=0.4.6      # PortAudio input stream + ADC timestamps
+soundfile>=0.12.1       # WAV writing/reading (libsndfile)
+pynput>=1.7.6           # global keydown hook (needs macOS Accessibility permission)
+
+# preprocessing / features
+numpy>=1.24
+scipy>=1.10             # band-pass filter for the sync-beep check
+librosa>=0.10           # mel spectrograms
+
+# model / evaluation
+torch>=2.1              # CPU or Apple-silicon MPS
+matplotlib>=3.7         # confusion-matrix figures
