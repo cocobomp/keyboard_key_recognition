@@ -96,7 +96,34 @@ python capture.py --mode random --tag micA --target-keys 800
 ```
 
 Chaque run produit `data/raw/<session_id>/` : `audio.wav` (48 kHz mono),
-`keys.csv` (`timestamp,key,session_id,mode`) et `meta.json`.
+`keys.csv` (keydown, `timestamp,key,session_id,mode`), `events.csv` (tous les
+événements, `timestamp,event,key,session_id,mode`) et `meta.json`.
+
+### Enregistrement libre : `record.py`
+
+`capture.py` affiche un texte à taper (utile pour équilibrer les touches et
+séparer proprement prose/aléatoire). `record.py` fait l'inverse : **aucun
+prompt**, il enregistre le micro et **tous les événements clavier** (down *et*
+up) pendant que vous tapez ce que vous voulez, jusqu'à `Ctrl-C`.
+
+```bash
+python record.py                      # frappe libre, mode=free, jusqu'à Ctrl-C
+python record.py --duration 600        # arrêt auto après 10 min
+python record.py --mode prose --tag micB  # étiqueter une session libre
+```
+
+Même discipline d'horloge et même bip de sync que `capture.py`, et même format
+de sortie : `keys.csv` alimente directement `preprocess.py`, `events.csv`
+conserve la séquence complète down/up (utile pour les temps de maintien et
+l'inter-frappe). Les sessions `mode=free` ne comptent pas dans la comparaison
+prose/aléatoire de `eval.py` — pour l'expérience, garder `capture.py` ; `record.py`
+sert à capturer de la frappe réelle « au fil de l'eau ».
+
+> **Vie privée** : `record.py` est un enregistreur de frappe **global** — il logue
+> **tout** ce que vous tapez pendant qu'il tourne (mots de passe, autres fenêtres
+> comprises) dans des fichiers en clair. À n'utiliser que sur votre machine, pour
+> vos propres frappes. `data/` est git-ignoré ; évitez de taper des secrets
+> pendant un enregistrement.
 
 ### Synchronisation audio / frappes
 
@@ -166,6 +193,36 @@ sauvegardé dans `models/keycnn.pt`, la courbe dans `models/keycnn_trainlog.csv`
 Les chiffres de validation servent **uniquement** à choisir l'époque. Ce ne sont
 pas les résultats de l'expérience.
 
+### Baseline k-NN sur MFCC
+
+`baseline_knn.py` fournit un point de comparaison simple et non paramétrique : le
+CNN ne « vaut » que ce qu'il gagne au-dessus de ce baseline. Chaque fenêtre est
+résumée par un descripteur **MFCC** (moyenne + écart-type des MFCC et de leurs
+deltas dans le temps), puis classée par plus proches voisins.
+
+```bash
+python baseline_knn.py --split-file splits.json --results-dir results
+```
+
+Les MFCC sont la DCT des log-mel déjà calculés par `preprocess.py` : le baseline
+voit donc **exactement les mêmes fenêtres, la même config de features et le même
+split par session** que le CNN — la comparaison est honnête. `k` est réglé sur la
+session de validation (jamais sur le test), les features sont standardisées sur le
+train seulement, et il n'y a là non plus aucun split aléatoire.
+
+Sortie : `results/baseline_knn.json` (top-1/top-5 prose vs aléatoire, par
+session). Si `results/eval_results.json` du CNN est présent dans le même dossier,
+un tableau **CNN vs k-NN** est affiché directement :
+
+```
+regime       CNN top-1   kNN top-1   CNN top-5   kNN top-5
+prose            …%          …%          …%          …%
+random           …%          …%          …%          …%
+```
+
+Le chiffre qui compte reste l'aléatoire : c'est là que se lit ce que chaque modèle
+extrait vraiment de l'acoustique, sans béquille linguistique.
+
 ## 6. Évaluation — le cœur de l'expérience
 
 ```bash
@@ -232,9 +289,11 @@ miniature de ce que le garde-fou anti-fuite du corpus sert à éviter en vrai.
 
 | fichier | rôle |
 |---|---|
-| `capture.py` | enregistrement micro + log des keydown, horloge monotone commune, bip de sync |
+| `capture.py` | enregistrement micro + clavier avec prompt, horloge monotone commune, bip de sync ; classes partagées (Recorder, KeyLogger, écriture des fichiers) |
+| `record.py` | enregistrement libre : micro + **tous** les événements clavier (down/up), sans prompt |
 | `preprocess.py` | fenêtres 250 ms + mel-spectrogrammes, vérification du bip |
 | `train.py` | CNN, split par session, meilleur checkpoint |
+| `baseline_knn.py` | baseline k-NN sur MFCC, comparable au CNN (mêmes fenêtres, même split) |
 | `eval.py` | prose vs aléatoire, confusion, voisinage physique, décodage n-gram |
 | `kkr_common.py` | labels canoniques, layout physique, I/O session, mapping d'horloge |
 | `make_synthetic_sessions.py` | données factices pour tester la chaîne |

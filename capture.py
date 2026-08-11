@@ -195,12 +195,18 @@ class Recorder:
 
 
 class KeyLogger:
-    """Logs keydown events (auto-repeat filtered) with monotonic timestamps."""
+    """Logs every keyboard event (down and up) with monotonic timestamps.
+
+    `keydown_snapshot()` returns the auto-repeat-filtered keydowns used to window
+    the audio; `events_snapshot()` returns the full down/up stream for the
+    events.csv artefact.
+    """
 
     def __init__(self, session_id: str, mode: str):
         self.session_id = session_id
         self.mode = mode
-        self.events: list[tuple[float, str]] = []
+        self.events: list[tuple[float, str, str]] = []  # (t, "down"|"up", key)
+        self._down: list[tuple[float, str]] = []         # keydowns only
         self._held: set[str] = set()
         self._lock = threading.Lock()
         self._listener = None
@@ -227,12 +233,15 @@ class KeyLogger:
             if label in self._held:  # OS auto-repeat: not a physical keydown
                 return
             self._held.add(label)
-            self.events.append((t, label))
+            self.events.append((t, "down", label))
+            self._down.append((t, label))
 
     def _on_release(self, key):
+        t = time.monotonic()
         label = self._label(key)
         with self._lock:
             self._held.discard(label)
+            self.events.append((t, "up", label))
 
     def start(self):
         from pynput import keyboard
@@ -246,12 +255,62 @@ class KeyLogger:
             self._listener.stop()
 
     def count(self) -> int:
+        """Number of physical keydowns logged so far."""
         with self._lock:
-            return len(self.events)
+            return len(self._down)
 
-    def snapshot(self) -> list[tuple[float, str]]:
+    def keydown_snapshot(self) -> list[tuple[float, str]]:
+        with self._lock:
+            return list(self._down)
+
+    def events_snapshot(self) -> list[tuple[float, str, str]]:
         with self._lock:
             return list(self.events)
+
+
+# --------------------------------------------------------------------------- #
+# Session file writers (shared by capture.py and record.py)
+# --------------------------------------------------------------------------- #
+
+EVENTS_FIELDS = ("timestamp", "event", "key", "session_id", "mode")
+
+
+def write_session_files(out_dir, session_id, mode, downs, events):
+    """Write keys.csv (keydowns, the pipeline input) and events.csv (every event)."""
+    with open(os.path.join(out_dir, "keys.csv"), "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(kc.CSV_FIELDS))
+        w.writeheader()
+        for t, key in downs:
+            w.writerow({"timestamp": f"{t:.6f}", "key": key, "session_id": session_id, "mode": mode})
+    with open(os.path.join(out_dir, "events.csv"), "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(EVENTS_FIELDS))
+        w.writeheader()
+        for t, event, key in events:
+            w.writerow({"timestamp": f"{t:.6f}", "event": event, "key": key,
+                        "session_id": session_id, "mode": mode})
+
+
+def base_meta(session_id, mode, tag, recorder, beep):
+    """Common meta.json fields for both capture modes."""
+    return {
+        "session_id": session_id,
+        "mode": mode,
+        "tag": tag,
+        "capture_version": kc.CAPTURE_VERSION,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "samplerate": recorder.samplerate,
+        "channels": 1,
+        "blocksize": recorder.blocksize,
+        "device": recorder.device_name(),
+        "audio_start_mono": recorder.audio_start_mono,
+        "clock_checkpoints": recorder.checkpoints,
+        "clock_offset_s": 0.0,
+        "frames_written": recorder.frames_written,
+        "duration_s": recorder.frames_written / recorder.samplerate,
+        "overflow_events": recorder.overflow_events,
+        "sync_beep": beep,
+        "python": sys.version.split()[0],
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -403,48 +462,31 @@ def main(argv=None) -> int:
     time.sleep(0.4)  # trailing audio for the last keystroke's window
     rec.stop()
 
-    events = logger.snapshot()
-    csv_path = os.path.join(out_dir, "keys.csv")
-    with open(csv_path, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(kc.CSV_FIELDS))
-        w.writeheader()
-        for t, key in events:
-            w.writerow({"timestamp": f"{t:.6f}", "key": key, "session_id": session_id, "mode": args.mode})
+    downs = logger.keydown_snapshot()
+    events = logger.events_snapshot()
+    write_session_files(out_dir, session_id, args.mode, downs, events)
 
-    meta = {
-        "session_id": session_id,
-        "mode": args.mode,
-        "tag": args.tag,
-        "capture_version": kc.CAPTURE_VERSION,
-        "created_utc": datetime.now(timezone.utc).isoformat(),
-        "samplerate": args.samplerate,
-        "channels": 1,
-        "blocksize": args.blocksize,
-        "device": rec.device_name(),
-        "audio_start_mono": rec.audio_start_mono,
-        "clock_checkpoints": rec.checkpoints,
-        "clock_offset_s": 0.0,
-        "frames_written": rec.frames_written,
-        "duration_s": rec.frames_written / args.samplerate,
-        "overflow_events": rec.overflow_events,
-        "sync_beep": beep,
-        "n_key_events": len(events),
-        "prompt_lines": lines,
-        "prompt_seed": seed,
-        "prose_corpus": os.path.abspath(args.prose_corpus) if args.mode == "prose" else None,
-        "aborted": aborted,
-        "python": sys.version.split()[0],
-    }
+    meta = base_meta(session_id, args.mode, args.tag, rec, beep)
+    meta.update(
+        {
+            "n_key_events": len(downs),
+            "n_raw_events": len(events),
+            "prompt_lines": lines,
+            "prompt_seed": seed,
+            "prose_corpus": os.path.abspath(args.prose_corpus) if args.mode == "prose" else None,
+            "aborted": aborted,
+        }
+    )
     kc.write_json(os.path.join(out_dir, "meta.json"), meta)
 
     dur = meta["duration_s"]
     print(f"\naudio     : {dur:.1f} s ({rec.frames_written} frames), overflows={rec.overflow_events}")
-    print(f"keystrokes: {len(events)}")
-    if events and dur > 0:
-        print(f"rate      : {len(events) / dur:.1f} keys/s")
+    print(f"keystrokes: {len(downs)} keydowns ({len(events)} raw events)")
+    if downs and dur > 0:
+        print(f"rate      : {len(downs) / dur:.1f} keys/s")
     if rec.overflow_events:
         print("note: input overflows occurred; clock checkpoints re-anchor the mapping.")
-    if not events:
+    if not downs:
         print("WARNING: zero keystrokes logged — check the Accessibility permission.", file=sys.stderr)
     print(f"session written to {out_dir}\n")
     return 0
