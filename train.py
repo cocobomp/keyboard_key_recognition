@@ -124,11 +124,13 @@ class KeyCNN(nn.Module):
             ]
             in_ch = w
         self.features = nn.Sequential(*blocks)
-        self.pool = nn.AdaptiveAvgPool2d((2, 2))
+        # Global average pooling: output is always 1x1, so it avoids the MPS
+        # "non-divisible adaptive pool" limitation regardless of the mel/frame size.
+        self.pool = nn.AdaptiveAvgPool2d(1)
         self.head = nn.Sequential(
             nn.Flatten(),
             nn.Dropout(dropout),
-            nn.Linear(in_ch * 4, 128),
+            nn.Linear(in_ch, 128),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
             nn.Linear(128, n_classes),
