@@ -7,3 +7,6 @@ data/
 models/
 results/
 corpus/lm_train.txt
+
+# per-run split (built from your own sessions by run.py) — not shared
+splits.json
