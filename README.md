@@ -1,4 +1,17 @@
+<!-- Ce dépôt regroupe plusieurs POC de reconnaissance par machine learning, en local.
+     Une branche = un projet.
+
+       * branche clavier (celle-ci) : reconnaissance acoustique de frappes clavier
+       * branche son                : reconnaissance d'événements sonores (ronflement,
+                                      activité nocturne, bruits du quotidien)
+                                      → prompt de démarrage : PROMPT_SOUND_PROJECT.md
+-->
+
 # Reconnaissance acoustique de frappes clavier — POC local (macOS)
+
+> Un des projets du dépôt (**branche clavier**). Le projet frère « reconnaissance
+> d'événements sonores » vit sur sa propre branche — voir
+> [`PROMPT_SOUND_PROJECT.md`](PROMPT_SOUND_PROJECT.md).
 
 Pipeline Python pour mesurer **si un CNN peut reconstituer ce que je tape à
 partir du son de mon clavier**, en local, sur mes propres enregistrements.
