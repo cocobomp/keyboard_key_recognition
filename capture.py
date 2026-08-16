@@ -354,8 +354,8 @@ def play_sync_beep(freq: float, duration: float, amplitude: float, samplerate: i
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--mode", choices=("prose", "random"), required=True,
-                   help="prose = natural English, random = random character strings")
+    p.add_argument("--mode", choices=("prose", "random"), default=None,
+                   help="prose = natural English, random = random character strings (required to record)")
     p.add_argument("--session-id", default=None, help="default: <mode>_<UTC timestamp>[_<tag>]")
     p.add_argument("--tag", default=None, help="free-form suffix, e.g. mic-position-b")
     p.add_argument("--out-dir", default="data/raw")
@@ -382,6 +382,11 @@ def main(argv=None) -> int:
 
         print(sd.query_devices())
         return 0
+
+    if args.mode is None:
+        print("error: --mode {prose,random} is required to record a session "
+              "(only --list-devices works without it).", file=sys.stderr)
+        return 2
 
     try:
         import sounddevice  # noqa: F401
