@@ -118,6 +118,11 @@ PAGE = """<!doctype html>
   .top5 { color:var(--muted); letter-spacing:.15em; }
   footer { color:var(--muted); font-size:12px; text-align:center; padding:14px; }
 </style></head><body>
+<div id="demobanner" style="display:none; background:#8957e5; color:#fff; text-align:center;
+     padding:10px; font-weight:700; font-size:14px;">
+  ⚠️ MODE DÉMO — fausses frappes au hasard, l'app ne t'écoute PAS.
+  Relance sans <code>--demo</code> pour utiliser ton micro.
+</div>
 <header>
   <span class="dot" id="dot"></span>
   <h1>Clavier au son <span class="sub" id="mode"></span></h1>
@@ -156,6 +161,7 @@ function apply(st){
   document.getElementById('heard').textContent = st.heard;
   document.getElementById('typed').textContent = st.typed;
   document.getElementById('dot').className = 'dot' + (st.running ? ' on' : '');
+  document.getElementById('demobanner').style.display = st.demo ? 'block' : 'none';
   if (st.info && st.info.mode) document.getElementById('mode').textContent = '· ' + st.info.mode;
   if (st.info && st.info.line) document.getElementById('info').textContent = st.info.line;
   const t = document.getElementById('ticker'); t.innerHTML='';
@@ -318,7 +324,8 @@ def run_demo(hub: Hub, args):
     alphabet = list("abcdefghijklmnopqrstuvwxyz") + ["space"]
     rng = np.random.default_rng(0)
     chance = 1.0 / len(alphabet)
-    hub.state.update({"chance": chance, "info": {"mode": "DÉMO (fausses prédictions)", "line": "aperçu UI"}})
+    hub.state.update({"demo": True, "chance": chance,
+                      "info": {"mode": "DÉMO (fausses prédictions)", "line": "aperçu UI"}})
     typed, heard, recent = [], [], []
     n = c1 = c5 = 0
     i = 0
