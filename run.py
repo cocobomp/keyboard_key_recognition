@@ -36,7 +36,12 @@ CKPT = "models/keycnn.pt"
 def sh(script: str, *cargs, check: bool = True) -> int:
     cmd = [PY, os.path.join(HERE, script), *[str(a) for a in cargs]]
     print(f"\n$ {' '.join(cmd)}\n")
-    rc = subprocess.run(cmd).returncode
+    try:
+        rc = subprocess.run(cmd).returncode
+    except KeyboardInterrupt:
+        # Ctrl-C also reaches this parent; the child already handled it and
+        # printed its own output. Don't dump a traceback on top of that.
+        return 130
     if check and rc != 0:
         raise SystemExit(f"step failed ({script}, exit {rc}).")
     return rc
