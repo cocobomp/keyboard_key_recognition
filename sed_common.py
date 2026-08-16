@@ -259,6 +259,10 @@ def list_sessions(raw_dir: str = RAW_DIR, only: Sequence[str] | None = None) -> 
             if not os.path.isdir(path) or not os.path.isfile(meta_path):
                 continue
             meta = read_json(meta_path)
+            if not meta.get("chunks"):
+                # session d'un autre projet (ex. branche clavier : audio.wav
+                # sans chunks) ou capture jamais démarrée — pas à nous
+                continue
             sessions.append(
                 Session(
                     session_id=meta.get("session_id", name),
