@@ -186,6 +186,8 @@ def metrics_table(m: dict) -> list[str]:
              "|---|---|---|---|---|"]
     for lab, v in sorted(m["per_class"].items()):
         sup = v.get("support", v.get("n_true_episodes", 0))
+        if sup == 0:
+            continue  # ex. « (autre) » : jamais dans la vérité terrain
         lines.append(f"| {lab} | {v['precision']:.2f} | {v['recall']:.2f} | "
                      f"{v['f1']:.2f} | {sup} |")
     return lines
@@ -271,7 +273,19 @@ def main() -> int:
                                      for f in evaluable})[f] for f in evaluable]
               if has_zeroshot else None)
 
-    classes = sorted(set(y_true) | set(y_model) | set(y_zero or []))
+    # les prédictions hors du vocabulaire de la vérité terrain (surtout la
+    # baseline : classes AudioSet brutes) sont repliées dans « (autre) » —
+    # matrices compactes, macro-F1 comparables entre les deux systèmes
+    truth_classes = sorted(set(y_true))
+    OTHER = "(autre)"
+
+    def fold(y):
+        return [lab if lab in truth_classes else OTHER for lab in y]
+
+    y_model = fold(y_model)
+    y_zero = fold(y_zero) if y_zero else None
+    classes = truth_classes + ([OTHER] if OTHER in y_model + (y_zero or [])
+                               else [])
     m_model = clip_metrics(y_true, y_model, classes)
     m_zero = clip_metrics(y_true, y_zero, classes) if y_zero else None
 
