@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+
+# enregistrements, clips, embeddings, labels, modèles et résultats :
+# artefacts locaux, JAMAIS versionnés (vie privée — voir README)
+data/
+models/
+results/
+
+# split par run (construit depuis TES sessions par run.py) — pas partagé
+splits.json

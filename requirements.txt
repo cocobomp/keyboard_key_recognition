@@ -1,0 +1,17 @@
+# capture (macOS)
+sounddevice>=0.4.6      # flux PortAudio + timestamps ADC
+soundfile>=0.12.1       # FLAC/WAV (libsndfile)
+
+# traitement / features
+numpy>=1.24
+scipy>=1.10             # filtres (générateur synthétique, détection)
+librosa>=0.10           # log-mels (backend mel + spectrogrammes de l'UI)
+
+# clustering / classifieur / éval
+scikit-learn>=1.3       # HDBSCAN natif, LogisticRegression, métriques
+joblib>=1.3             # checkpoint du classifieur
+matplotlib>=3.7         # timeline, confusion, spectrogrammes
+
+# backend d'embedding AST (recommandé ; le backend mel marche sans)
+torch>=2.1              # CPU ou Apple Silicon (mps)
+transformers>=4.35      # MIT/ast-finetuned-audioset-10-10-0.4593
