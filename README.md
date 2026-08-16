@@ -324,6 +324,35 @@ Points importants :
   un micro très différent fait chuter la démo (le modèle a appris un canal en
   plus des touches).
 
+## 6ter. App web live (et pont vers l'iPhone)
+
+`app.py` sert la même démo que `live.py`, mais dans une **page web** — plus jolie,
+et ouvrable **sur l'iPhone** (même Wi-Fi) pour mettre le résultat sur le téléphone
+sans app native.
+
+```bash
+python app.py --demo                       # aperçu de l'interface, sans micro ni modèle
+python app.py --checkpoint models/keycnn.pt   # temps réel (mic + clavier)
+```
+
+Au lancement il affiche deux URL :
+- `http://localhost:8000` sur le Mac,
+- `http://<ip-du-mac>:8000` à ouvrir dans Safari sur l'iPhone.
+
+Le modèle tourne **sur le Mac** ; l'iPhone n'est qu'un écran. C'est le pont rapide.
+
+### Vers une vraie app iPhone native
+
+Ce qui se transfère vers iOS, c'est **le modèle**, pas l'interface :
+- exporter le CNN vers **Core ML** (`coremltools`) pour le faire tourner on-device,
+- ré-implémenter le calcul du mel-spectrogramme côté Swift (Accelerate) **à
+  l'identique** de `preprocess.py`, ou le replier dans le graphe du modèle,
+- **ré-entraîner avec le micro de l'iPhone** (chaque micro a sa signature, un
+  modèle « micro du Mac » transfère mal),
+- gérer la **segmentation aveugle** (le téléphone n'a pas les événements clavier).
+
+Les points 3 et 4 sont les vrais chantiers de la version mobile.
+
 ## 7. Test à blanc sans micro
 
 Pour vérifier que la chaîne tourne (features → CNN → éval) sans rien enregistrer :
@@ -357,7 +386,8 @@ miniature de ce que le garde-fou anti-fuite du corpus sert à éviter en vrai.
 | `train.py` | CNN, split par session, meilleur checkpoint |
 | `baseline_knn.py` | baseline k-NN sur MFCC, comparable au CNN (mêmes fenêtres, même split) |
 | `eval.py` | prose vs aléatoire, confusion, voisinage physique, décodage n-gram |
-| `live.py` | démo temps réel : tape et vois ce que le modèle croit que tu écris |
+| `live.py` | démo temps réel (terminal) : tape et vois ce que le modèle croit que tu écris |
+| `app.py` | **app web live** : même démo dans le navigateur, ouvrable aussi sur l'iPhone (même Wi-Fi) |
 | `kkr_common.py` | labels canoniques, layout physique, I/O session, mapping d'horloge |
 | `make_synthetic_sessions.py` | données factices pour tester la chaîne |
 | `fetch_lm_corpus.py` | texte public (Gutenberg) pour le modèle de langue |
